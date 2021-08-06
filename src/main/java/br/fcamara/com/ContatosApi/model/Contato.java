@@ -2,12 +2,10 @@ package br.fcamara.com.ContatosApi.model;
 
 import com.sun.istack.NotNull;
 
-import javax.persistence.Entity;
-import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
-import javax.persistence.Id;
+import javax.persistence.*;
 
 @Entity
+@Table(name = "contatos")
 public class Contato {
 
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -15,12 +13,30 @@ public class Contato {
 
     private String nome;
     private String telefone;
+    private String email;
+
+    @OneToOne(cascade = CascadeType.ALL)
+    @JoinColumn(name = "endereco_id", referencedColumnName = "id")
+    private Endereco endereco;
 
     public Contato() {}
 
     public Contato(String nome, String telefone) {
         this.nome = nome;
         this.telefone = telefone;
+    }
+
+    public Contato(String nome, String telefone, String email) {
+        this.nome = nome;
+        this.telefone = telefone;
+        this.email = email;
+    }
+
+    public Contato(String nome, String telefone, String email, Endereco endereco) {
+        this.nome = nome;
+        this.telefone = telefone;
+        this.email = email;
+        this.endereco = endereco;
     }
 
     public Long getId() {
@@ -45,5 +61,21 @@ public class Contato {
 
     public void setTelefone(String telefone) {
         this.telefone = telefone;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public Endereco getEndereco() {
+        return endereco;
+    }
+
+    public void setEndereco(Endereco endereco) {
+        this.endereco = endereco;
     }
 }

@@ -1,8 +1,15 @@
 package br.fcamara.com.ContatosApi.controller;
 
+import br.fcamara.com.ContatosApi.controller.dto.ContatoDto;
 import br.fcamara.com.ContatosApi.controller.form.ContatoForm;
+import br.fcamara.com.ContatosApi.controller.form.ContatoeEnderecoForm;
+import br.fcamara.com.ContatosApi.controller.form.EnderecoForm;
+import br.fcamara.com.ContatosApi.controller.dto.EnderecoDto;
 import br.fcamara.com.ContatosApi.model.Contato;
+import br.fcamara.com.ContatosApi.model.Endereco;
 import br.fcamara.com.ContatosApi.repository.ContatoRepository;
+import br.fcamara.com.ContatosApi.repository.EnderecoRepository;
+import br.fcamara.com.ContatosApi.service.ValidadorDeContatoExistenteService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -21,16 +28,32 @@ public class ContatosController {
     @Autowired
     private ContatoRepository contatoRepository;
 
+    @Autowired
+    private EnderecoRepository enderecoRepository;
+
     @GetMapping
-    public List<Contato> listaTelefonica() {
-        return contatoRepository.findAll();
+    public List<ContatoDto> listaTelefonica() {
+        List<Contato> contatos =  contatoRepository.findAll();
+        return ContatoDto.converter(contatos);
     }
 
-    @GetMapping("/{id}")
-    public ResponseEntity<Contato> contato(@PathVariable Long id) {
-        Optional<Contato> optional = contatoRepository.findById(id);
+    @GetMapping("/{nome}")
+    public ResponseEntity<ContatoDto> contato(@PathVariable String nome) {
+        Optional<Contato> optional = contatoRepository.findByNome(nome);
         if(optional.isPresent()) {
-            return ResponseEntity.ok(contatoRepository.getById(id));
+            ContatoDto contatoDto = new ContatoDto(optional.get());
+            return ResponseEntity.ok(contatoDto);
+        }
+        return ResponseEntity.notFound().build();
+
+    }
+
+    @GetMapping("/{nome}/endereco")
+    public ResponseEntity<EnderecoDto> endereco(@PathVariable String nome) {
+        Optional<Contato> optional = contatoRepository.findByNome(nome);
+        if(optional.isPresent()) {
+            EnderecoDto enderecoDto = new EnderecoDto(optional.get().getEndereco());
+            return ResponseEntity.ok(enderecoDto);
         }
         return ResponseEntity.notFound().build();
 
@@ -38,32 +61,54 @@ public class ContatosController {
 
     @PostMapping
     @Transactional
-    public ResponseEntity<Contato> adicionar(@RequestBody @Valid ContatoForm form, UriComponentsBuilder uriBuilder) {
+    public ResponseEntity<ContatoDto> adicionar(@RequestBody @Valid ContatoeEnderecoForm form, UriComponentsBuilder uriBuilder) {
+            Optional<Contato> optional = contatoRepository.findByNome(form.getContatoForm().getNome());
+            if (optional.isEmpty()) {
+                System.out.println(form.getEnderecoForm().getNumero());
+                Endereco endereco = form.getEnderecoForm().criarEndereco();
+                enderecoRepository.save(endereco);
+                Contato contato = form.getContatoForm().converter(endereco);
+                contatoRepository.save(contato);
 
-        Contato contato = form.converter();
-        contatoRepository.save(contato);
-
-        URI uri = uriBuilder.path("/contato/{id}").buildAndExpand(contato.getId()).toUri();
-        return ResponseEntity.created(uri).body(contato);
+                URI uri = uriBuilder.path("/contato/{nome}").buildAndExpand(contato.getNome()).toUri();
+                return ResponseEntity.created(uri).body(new ContatoDto(contato));
+            }
+            throw new ContatoExistenteException();
     }
 
-    @PutMapping("/{id}")
+    /* ATUALIZA APENAS OS DADOOS DO USUARIO DO CONTATO */
+    @PutMapping("/{nome}")
     @Transactional
-    public ResponseEntity<Contato> atualizar(@PathVariable Long id,@RequestBody @Valid ContatoForm form) {
-        Optional<Contato> optional = contatoRepository.findById(id);
+    public ResponseEntity<ContatoDto> atualizar(@PathVariable String nome,@RequestBody @Valid ContatoForm form) {
+        Optional<Contato> optional = contatoRepository.findByNome(nome);
         if(optional.isPresent()) {
-            Contato contato = form.atualizar(id, contatoRepository);
-            return ResponseEntity.ok(contato);
+            ValidadorDeContatoExistenteService.verificar(form.getNome(), contatoRepository);
+            Contato contato = form.atualizar(nome, contatoRepository);
+            return ResponseEntity.ok(new ContatoDto(contato));
         }
         return  ResponseEntity.notFound().build();
     }
 
-    @DeleteMapping("/{id}")
+    /* ATUALIZA APENAS O ENDERECO DO CONTATO */
+    @PutMapping("/{nome}/endereco")
     @Transactional
-    public ResponseEntity<?> deletar(@PathVariable Long id) {
-        Optional<Contato> optional = contatoRepository.findById(id);
+    public ResponseEntity<EnderecoDto> atualizaroEndereco(@PathVariable String nome,@RequestBody @Valid EnderecoForm form) {
+        Optional<Contato> optional = contatoRepository.findByNome(nome);
         if(optional.isPresent()) {
-            contatoRepository.deleteById(id);
+            Endereco endereco = form.atualizar(optional.get());
+
+            return ResponseEntity.ok(new EnderecoDto(endereco));
+        }
+        return  ResponseEntity.notFound().build();
+    }
+
+    @DeleteMapping("/{nome}")
+    @Transactional
+    public ResponseEntity<?> deletar(@PathVariable String nome) {
+        Optional<Contato> optional = contatoRepository.findByNome(nome);
+        if(optional.isPresent()) {
+            enderecoRepository.deleteById(optional.get().getEndereco().getId());
+            contatoRepository.deleteByNome(nome);
             return ResponseEntity.ok().build();
         }
         return ResponseEntity.notFound().build();
