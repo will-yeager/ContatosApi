@@ -13,5 +13,4 @@ public class ContatosApiApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(ContatosApiApplication.class, args);
 	}
-
 }
